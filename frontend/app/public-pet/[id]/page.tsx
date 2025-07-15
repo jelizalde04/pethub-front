@@ -911,19 +911,20 @@ export default function PublicPetProfilePage() {
                     <div className="space-y-3 mb-4">
                       <p className="text-white leading-relaxed whitespace-pre-wrap">{post.content}</p>
 
-                      {post.image && (
-                        <div className="rounded-lg overflow-hidden border border-[#30363d]">
-                          <img
-                            src={post.image || "/placeholder.svg"}
-                            alt="Post image"
-                            className="w-full h-auto max-h-96 object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = "/placeholder.svg?height=300&width=400"
-                            }}
-                          />
-                        </div>
-                      )}
+                     {post.image && (
+  <div className="rounded-lg overflow-hidden border border-[#30363d] mt-3 bg-[#0d1117]">
+    <img
+      src={post.image}
+      alt="Post image"
+      className="w-full h-auto min-h-[200px] max-h-[600px] object-contain"
+      style={{ aspectRatio: 'auto' }}
+      onError={(e) => {
+        const target = e.target as HTMLImageElement
+        target.src = "/placeholder.svg?height=300&width=400"
+      }}
+    />
+  </div>
+)}
                     </div>
 
                     <div className="flex items-center gap-4 pt-2 border-t border-[#30363d]">

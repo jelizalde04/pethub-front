@@ -100,7 +100,16 @@ export function PostCard({ post, petName, petImage, onEdit, onDelete, disableLik
     }
   }
 
-  const isEdited = post.createdAt !== post.updatedAt
+  // Mejorada lógica para detectar si fue editado
+  // Solo considera editado si la diferencia entre creación y actualización es mayor a 1 minuto
+  const isEdited = () => {
+    const createdAt = new Date(post.createdAt).getTime()
+    const updatedAt = new Date(post.updatedAt).getTime()
+    const diffInMinutes = Math.abs(updatedAt - createdAt) / (1000 * 60)
+    
+    // Solo considera editado si la diferencia es mayor a 1 minuto
+    return diffInMinutes > 1
+  }
 
   return (
     <div className="bg-[#0d1117] border border-[#30363d] rounded-lg p-4 space-y-4">
@@ -121,7 +130,7 @@ export function PostCard({ post, petName, petImage, onEdit, onDelete, disableLik
             <div className="flex items-center gap-2 text-sm text-[#8b949e]">
               <Calendar className="h-3 w-3" />
               <span>{formatDate(post.createdAt)}</span>
-              {isEdited && (
+              {isEdited() && (
                 <>
                   <span>•</span>
                   <span className="text-[#6e7681]">edited</span>
@@ -170,40 +179,43 @@ export function PostCard({ post, petName, petImage, onEdit, onDelete, disableLik
 
         {/* Post Image */}
         {post.image && (
-          <div className="rounded-lg overflow-hidden border border-[#30363d]">
-            <img
-              src={post.image || "/placeholder.svg"}
-              alt="Post image"
-              className="w-full h-auto max-h-96 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => setImageModalOpen(true)}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement
-                target.src = "/placeholder.svg?height=300&width=400"
-              }}
-            />
-          </div>
-        )}
+  <div className="rounded-lg overflow-hidden border border-[#30363d] bg-[#0d1117]">
+    <div className="relative">
+      <img
+        src={post.image || "/placeholder.svg"}
+        alt="Post image"
+        className="w-full h-auto min-h-[250px] max-h-[600px] object-contain cursor-pointer hover:opacity-90 transition-opacity"
+        style={{ aspectRatio: 'auto' }}
+        onClick={() => setImageModalOpen(true)}
+        onError={(e) => {
+          const target = e.target as HTMLImageElement
+          target.src = "/placeholder.svg?height=300&width=400"
+        }}
+      />
+    </div>
+  </div>
+)}
       </div>
 
       {/* Post Actions */}
       <div className="flex items-center gap-4 pt-2 border-t border-[#30363d]">
-       {disableLike ? (
-  <div className="flex items-center gap-2 text-[#8b949e]">
-    <Heart className="h-4 w-4" />
-    <span className="text-sm font-medium">{currentLikes}</span>
-  </div>
-) : (
-  <button
-    onClick={handleLike}
-    disabled={isLiking}
-    className={`flex items-center gap-2 transition-colors ${
-      liked ? "text-[#f85149]" : "text-[#8b949e] hover:text-[#f85149]"
-    } ${isLiking ? "opacity-50 cursor-not-allowed" : ""}`}
-  >
-    <Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} />
-    <span className="text-sm font-medium">{currentLikes}</span>
-  </button>
-)}
+        {disableLike ? (
+          <div className="flex items-center gap-2 text-[#8b949e]">
+            <Heart className="h-4 w-4" />
+            <span className="text-sm font-medium">{currentLikes}</span>
+          </div>
+        ) : (
+          <button
+            onClick={handleLike}
+            disabled={isLiking}
+            className={`flex items-center gap-2 transition-colors ${
+              liked ? "text-[#f85149]" : "text-[#8b949e] hover:text-[#f85149]"
+            } ${isLiking ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            <Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} />
+            <span className="text-sm font-medium">{currentLikes}</span>
+          </button>
+        )}
       </div>
 
       {/* Image Modal */}

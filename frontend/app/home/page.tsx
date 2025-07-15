@@ -63,12 +63,11 @@ export default function HomePage() {
   const [posts, setPosts] = useState<PostWithPet[]>([])
   const [pets, setPets] = useState<Pet[]>([])
   const [loadingPosts, setLoadingPosts] = useState(true)
-  // likedPosts will now only track likes made in the current session
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set())
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
 
-  // Hook de búsqueda
+  
   const { filteredData: filteredPosts, totalResults } = useSearch({
     data: posts,
     searchFields: ['content', 'pet.name', 'pet.breed', 'pet.species', 'pet.responsible.name'],
@@ -92,7 +91,7 @@ export default function HomePage() {
 
     loadUserInfo()
     loadGlobalFeed()
-    // Removed loadLikedPosts function as the endpoint is not valid for initial load
+  
   }, [])
 
   const loadUserInfo = async () => {
@@ -140,7 +139,15 @@ export default function HomePage() {
     }
   }
 
-  // loadLikedPosts function removed as per user's request (endpoint not valid for initial load)
+  // Función para detectar si un post fue realmente editado
+  const isPostEdited = (post: Post) => {
+    const createdAt = new Date(post.createdAt).getTime()
+    const updatedAt = new Date(post.updatedAt).getTime()
+    const diffInMinutes = Math.abs(updatedAt - createdAt) / (1000 * 60)
+    
+    // Solo considera editado si la diferencia es mayor a 1 minuto
+    return diffInMinutes > 1
+  }
 
   const handleLike = async (postId: string, postPetId: string) => {
     if (!selectedPetId) {
@@ -321,7 +328,7 @@ export default function HomePage() {
                           <Calendar className="h-3 w-3" />
                           <span>{formatTimeAgo(post.createdAt)}</span>
                         </div>
-                        {post.createdAt !== post.updatedAt && (
+                        {isPostEdited(post) && (
                           <>
                             <span>•</span>
                             <span className="text-[#6e7681]">edited</span>
@@ -347,21 +354,21 @@ export default function HomePage() {
                   <div className="mb-4">
                     <p className="text-white leading-relaxed whitespace-pre-wrap mb-4">{post.content}</p>
 
-                 {post.image && (
-  <div className="rounded-lg overflow-hidden border border-[#30363d] mt-3">
-    <div className="relative bg-[#0d1117] flex items-center justify-center min-h-[250px]">
-      <img
-        src={post.image}
-        alt="Post image"
-        className="max-w-full max-h-[500px] w-auto h-auto object-contain"
-        onError={(e) => {
-          const target = e.target as HTMLImageElement
-          target.src = "/placeholder.svg?height=300&width=400"
-        }}
-      />
-    </div>
-  </div>
-)}
+                    {post.image && (
+                      <div className="rounded-lg overflow-hidden border border-[#30363d] mt-3">
+                        <div className="relative bg-[#0d1117] flex items-center justify-center min-h-[250px]">
+                          <img
+                            src={post.image}
+                            alt="Post image"
+                            className="max-w-full max-h-[500px] w-auto h-auto object-contain"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.src = "/placeholder.svg?height=300&width=400"
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-6 pt-4 border-t border-[#30363d]">

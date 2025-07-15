@@ -16,6 +16,7 @@ import Select from "react-select"
 import { Country, State, City } from "country-state-city"
 import { PET_BREEDS, SPECIES_OPTIONS } from "@/data/pet-breeds"
 import { Header } from "@/components/header"
+import ClientOnly from "@/components/ClientOnly"
 
 interface PetFormData {
   name: string
@@ -543,27 +544,30 @@ export default function CreatePetPage() {
                 </div>
 
                 {/* Species */}
-                <div>
-                  <Label className="block text-sm font-medium text-[#f0f6fc] mb-2">Species *</Label>
-                  <Select
-                    options={SPECIES_OPTIONS}
-                    value={selectedSpecies}
-                    onChange={handleSpeciesChange}
-                    placeholder="Select pet species"
-                    styles={selectStyles}
-                    isSearchable
-                  />
-                  {errors.species && (
-                    <p className="text-sm text-[#f85149] mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      {errors.species}
-                    </p>
-                  )}
-                </div>
+               <div>
+  <Label className="block text-sm font-medium text-[#f0f6fc] mb-2">Species *</Label>
+  <ClientOnly>
+    <Select
+      options={SPECIES_OPTIONS}
+      value={selectedSpecies}
+      onChange={handleSpeciesChange}
+      placeholder="Select pet species"
+      styles={selectStyles}
+      isSearchable
+    />
+  </ClientOnly>
+  {errors.species && (
+    <p className="text-sm text-[#f85149] mt-1 flex items-center gap-1">
+      <AlertCircle className="h-3 w-3" />
+      {errors.species}
+    </p>
+  )}
+</div>
 
                 {/* Breed */}
                 <div>
                   <Label className="block text-sm font-medium text-[#f0f6fc] mb-2">Breed *</Label>
+                    <ClientOnly>
                   <Select
                     options={availableBreeds}
                     value={selectedBreed}
@@ -573,6 +577,7 @@ export default function CreatePetPage() {
                     isSearchable
                     isDisabled={!selectedSpecies}
                   />
+                    </ClientOnly>
                   {errors.breed && (
                     <p className="text-sm text-[#f85149] mt-1 flex items-center gap-1">
                       <AlertCircle className="h-3 w-3" />
@@ -629,6 +634,7 @@ export default function CreatePetPage() {
                   {/* Country */}
                   <div>
                     <Label className="block text-xs font-medium text-[#8b949e] mb-1">Country</Label>
+                      <ClientOnly>
                     <Select
                       options={countryOptions}
                       value={selectedCountry}
@@ -637,6 +643,7 @@ export default function CreatePetPage() {
                       styles={selectStyles}
                       isSearchable
                     />
+                      </ClientOnly>
                   </div>
 
                   {/* State (if available) */}
