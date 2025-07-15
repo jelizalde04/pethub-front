@@ -19,21 +19,21 @@ jobs:
 
       - name: Generate .env.production
         run: |
-          echo "NEXT_PUBLIC_API_BASE_URL_UNO=${{ secrets.NEXT_PUBLIC_API_BASE_URL_UNO }}" > .env.production
-          echo "NEXT_PUBLIC_API_BASE_URL_DOS=${{ secrets.NEXT_PUBLIC_API_BASE_URL_DOS }}" >> .env.production
-          echo "NEXT_PUBLIC_MEDICAL_API_URL_UNO=${{ secrets.NEXT_PUBLIC_MEDICAL_API_URL_UNO }}" >> .env.production
-          echo "NEXT_PUBLIC_MEDICAL_API_URL_TRES=${{ secrets.NEXT_PUBLIC_MEDICAL_API_URL_TRES }}" >> .env.production
-          echo "NEXT_PUBLIC_MEDICAL_API_URL_DOS=${{ secrets.NEXT_PUBLIC_MEDICAL_API_URL_DOS }}" >> .env.production
-          echo "NEXT_PUBLIC_MEDICAL_API_URL_CINCO=${{ secrets.NEXT_PUBLIC_MEDICAL_API_URL_CINCO }}" >> .env.production
-          echo "NEXT_PUBLIC_FOLLOWERS_API_URL_TRES=${{ secrets.NEXT_PUBLIC_FOLLOWERS_API_URL_TRES }}" >> .env.production
-          echo "NEXT_PUBLIC_FOLLOWERS_API_URL_DOS=${{ secrets.NEXT_PUBLIC_FOLLOWERS_API_URL_DOS }}" >> .env.production
-          echo "NEXT_PUBLIC_FOLLOWERS_API_URL_UNO=${{ secrets.NEXT_PUBLIC_FOLLOWERS_API_URL_UNO }}" >> .env.production
-          echo "NEXT_PUBLIC_NOTIFICATIONS_API_URL=${{ secrets.NEXT_PUBLIC_NOTIFICATIONS_API_URL }}" >> .env.production
-          echo "NEXT_PUBLIC_WS_API_BASE_URL=${{ secrets.NEXT_PUBLIC_WS_API_BASE_URL }}" >> .env.production
+          echo "NEXT_PUBLIC_API_BASE_URL_UNO=${{ secrets.NEXT_PUBLIC_API_BASE_URL_UNO }}" > frontend/.env.production
+          echo "NEXT_PUBLIC_API_BASE_URL_DOS=${{ secrets.NEXT_PUBLIC_API_BASE_URL_DOS }}" >> frontend/.env.production
+          echo "NEXT_PUBLIC_MEDICAL_API_URL_UNO=${{ secrets.NEXT_PUBLIC_MEDICAL_API_URL_UNO }}" >> frontend/.env.production
+          echo "NEXT_PUBLIC_MEDICAL_API_URL_TRES=${{ secrets.NEXT_PUBLIC_MEDICAL_API_URL_TRES }}" >> frontend/.env.production
+          echo "NEXT_PUBLIC_MEDICAL_API_URL_DOS=${{ secrets.NEXT_PUBLIC_MEDICAL_API_URL_DOS }}" >> frontend/.env.production
+          echo "NEXT_PUBLIC_MEDICAL_API_URL_CINCO=${{ secrets.NEXT_PUBLIC_MEDICAL_API_URL_CINCO }}" >> frontend/.env.production
+          echo "NEXT_PUBLIC_FOLLOWERS_API_URL_TRES=${{ secrets.NEXT_PUBLIC_FOLLOWERS_API_URL_TRES }}" >> frontend/.env.production
+          echo "NEXT_PUBLIC_FOLLOWERS_API_URL_DOS=${{ secrets.NEXT_PUBLIC_FOLLOWERS_API_URL_DOS }}" >> frontend/.env.production
+          echo "NEXT_PUBLIC_FOLLOWERS_API_URL_UNO=${{ secrets.NEXT_PUBLIC_FOLLOWERS_API_URL_UNO }}" >> frontend/.env.production
+          echo "NEXT_PUBLIC_NOTIFICATIONS_API_URL=${{ secrets.NEXT_PUBLIC_NOTIFICATIONS_API_URL }}" >> frontend/.env.production
+          echo "NEXT_PUBLIC_WS_API_BASE_URL=${{ secrets.NEXT_PUBLIC_WS_API_BASE_URL }}" >> frontend/.env.production
 
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest .
+          docker build -f frontend/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest frontend
 
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
