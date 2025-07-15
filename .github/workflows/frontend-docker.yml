@@ -32,8 +32,7 @@ jobs:
           echo "NEXT_PUBLIC_WS_API_BASE_URL=${{ secrets.NEXT_PUBLIC_WS_API_BASE_URL }}" >> frontend/.env.production
 
       - name: Build Docker image
-        run: |
-          docker build -f frontend/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest frontend
+        run: docker build -f frontend/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest frontend
 
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
