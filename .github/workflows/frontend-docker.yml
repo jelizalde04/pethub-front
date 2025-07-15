@@ -47,7 +47,7 @@ jobs:
       - name: Deploy to QA EC2 via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
-          host: ${{ secrets.EC2_FRONTEND_DOMAIN_TEST }}
+          host: ${{ secrets.EC2_FRONTEND_TEST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
@@ -68,9 +68,9 @@ jobs:
       - name: Deploy to PROD EC2 via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
-          host: ${{ secrets.EC2_FRONTEND_DOMAIN_PROD }}
+          host: ${{ secrets.EC2_FRONTEND_PROD }}
           username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY_PROD }}
+          key: ${{ secrets.EC2_KEY_PROD }}
           port: 22
           script: |
             docker ps -a --format '{{.Names}}' | grep -Eq "^frontend$" && docker stop frontend && docker rm frontend
