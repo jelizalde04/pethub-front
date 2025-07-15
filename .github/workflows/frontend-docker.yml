@@ -1,0 +1,90 @@
+name: Docker Build and Deploy Frontend
+
+on:
+  push:
+    branches:
+      - test
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build_and_push_frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Generate .env.production
+        run: |
+          echo "NEXT_PUBLIC_API_BASE_URL_UNO=${{ secrets.NEXT_PUBLIC_API_BASE_URL_UNO }}" > .env.production
+          echo "NEXT_PUBLIC_API_BASE_URL_DOS=${{ secrets.NEXT_PUBLIC_API_BASE_URL_DOS }}" >> .env.production
+          echo "NEXT_PUBLIC_MEDICAL_API_URL_UNO=${{ secrets.NEXT_PUBLIC_MEDICAL_API_URL_UNO }}" >> .env.production
+          echo "NEXT_PUBLIC_MEDICAL_API_URL_TRES=${{ secrets.NEXT_PUBLIC_MEDICAL_API_URL_TRES }}" >> .env.production
+          echo "NEXT_PUBLIC_MEDICAL_API_URL_DOS=${{ secrets.NEXT_PUBLIC_MEDICAL_API_URL_DOS }}" >> .env.production
+          echo "NEXT_PUBLIC_MEDICAL_API_URL_CINCO=${{ secrets.NEXT_PUBLIC_MEDICAL_API_URL_CINCO }}" >> .env.production
+          echo "NEXT_PUBLIC_FOLLOWERS_API_URL_TRES=${{ secrets.NEXT_PUBLIC_FOLLOWERS_API_URL_TRES }}" >> .env.production
+          echo "NEXT_PUBLIC_FOLLOWERS_API_URL_DOS=${{ secrets.NEXT_PUBLIC_FOLLOWERS_API_URL_DOS }}" >> .env.production
+          echo "NEXT_PUBLIC_FOLLOWERS_API_URL_UNO=${{ secrets.NEXT_PUBLIC_FOLLOWERS_API_URL_UNO }}" >> .env.production
+          echo "NEXT_PUBLIC_NOTIFICATIONS_API_URL=${{ secrets.NEXT_PUBLIC_NOTIFICATIONS_API_URL }}" >> .env.production
+          echo "NEXT_PUBLIC_WS_API_BASE_URL=${{ secrets.NEXT_PUBLIC_WS_API_BASE_URL }}" >> .env.production
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest .
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
+
+  deploy_qa:
+    needs: build_and_push_frontend
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/test'
+    steps:
+      - name: Deploy to EC2 QA via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_FRONTEND_DOMAIN_TEST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            docker ps -a --format '{{.Names}}' | grep -Eq "^frontend$" && docker stop frontend && docker rm frontend
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
+            docker run -d \
+              --name frontend \
+              -p 3000:3000 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
+            docker logs frontend || true
+            docker image prune -f
+            docker images ${{ secrets.DOCKERHUB_USERNAME }}/frontend --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}" | tail -n +2 | head -n -1 | awk '{print $3}' | xargs -r docker rmi || true
+
+  deploy_prod:
+    needs: build_and_push_frontend
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy to EC2 PROD via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_FRONTEND_DOMAIN_PROD }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY_PROD }}
+          port: 22
+          script: |
+            docker ps -a --format '{{.Names}}' | grep -Eq "^frontend$" && docker stop frontend && docker rm frontend
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
+            docker run -d \
+              --name frontend \
+              -p 3000:3000 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
+            docker logs frontend || true
+            docker image prune -f
+            docker images ${{ secrets.DOCKERHUB_USERNAME }}/frontend --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}" | tail -n +2 | head -n -1 | awk '{print $3}' | xargs -r docker rmi || true
