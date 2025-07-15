@@ -412,7 +412,7 @@ export default function CreatePetPage() {
 
         // Show success message and redirect to home after 1 second
         setTimeout(() => {
-          window.location.href = "/home"
+          window.location.href = "/pets"
         }, 1000)
       } else {
         const errorData = data as ApiErrorResponse
@@ -814,7 +814,7 @@ export default function CreatePetPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => (window.location.href = "/home")}
+                    onClick={() => (window.location.href = "/pets")}
                     className="border-[#30363d] text-[#8b949e] hover:text-white hover:bg-[#21262d]"
                   >
                     Cancel

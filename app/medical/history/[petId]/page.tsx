@@ -20,6 +20,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { makeAuthenticatedRequest } from "@/utils/auth"
 import { Header } from "@/components/header"
 import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal"
+import { useSearch } from "@/hooks/useSearch"
 
 interface MedicalRecord {
   id: string
@@ -42,9 +43,17 @@ export default function MedicalHistoryPage() {
 
   const [records, setRecords] = useState<MedicalRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; recordId: string | null }>({
     isOpen: false,
     recordId: null,
+  })
+
+  // Hook de búsqueda
+  const { filteredData: filteredRecords, totalResults } = useSearch({
+    data: records,
+    searchFields: ['healthStatus', 'diseases', 'treatments', 'vaccinations', 'allergies', 'specialCare'],
+    searchQuery
   })
 
   useEffect(() => {
@@ -140,7 +149,10 @@ export default function MedicalHistoryPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0d1117]">
-        <Header />
+        <Header 
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin text-white mx-auto mb-4" />
@@ -153,16 +165,24 @@ export default function MedicalHistoryPage() {
 
   return (
     <div className="min-h-screen bg-[#0d1117]">
-      <Header />
+      <Header 
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center gap-4 mb-8">
           <button onClick={handleBack} className="text-[#8b949e] hover:text-white transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold text-white">Medical History</h1>
             <p className="text-[#8b949e]">Complete medical record history for this pet</p>
+            {searchQuery && (
+              <p className="text-[#8b949e] text-sm mt-1">
+                {totalResults} results for "{searchQuery}"
+              </p>
+            )}
           </div>
         </div>
 
@@ -175,12 +195,18 @@ export default function MedicalHistoryPage() {
               Go Back
             </Button>
           </div>
+        ) : filteredRecords.length === 0 && searchQuery ? (
+          <div className="text-center py-12">
+            <Stethoscope className="h-16 w-16 text-[#30363d] mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-white mb-2">No Results Found</h2>
+            <p className="text-[#8b949e] mb-6">No medical records found for "{searchQuery}". Try a different search term.</p>
+          </div>
         ) : (
           <div className="space-y-6">
-            {records.map((record, index) => (
+            {filteredRecords.map((record, index) => (
               <div key={record.id} className="relative">
                 {/* Timeline connector */}
-                {index < records.length - 1 && (
+                {index < filteredRecords.length - 1 && (
                   <div className="absolute left-6 top-16 w-0.5 h-full bg-[#30363d] z-0"></div>
                 )}
 
@@ -191,7 +217,7 @@ export default function MedicalHistoryPage() {
                   {/* Record Header */}
                   <div className="flex items-center justify-between mb-4 ml-6">
                     <div>
-                      <h3 className="text-lg font-semibold text-white">Medical Record #{records.length - index}</h3>
+                      <h3 className="text-lg font-semibold text-white">Medical Record #{records.length - records.indexOf(record)}</h3>
                       <p className="text-[#8b949e] text-sm">Created on {formatDateTime(record.createdAt)}</p>
                     </div>
 

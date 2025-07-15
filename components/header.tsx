@@ -1,8 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Search, Plus, Settings, PawPrint, Bell } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Search, Plus, Settings, PawPrint, Bell, ArrowLeft } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { usePathname } from "next/navigation"
 import {
@@ -18,7 +17,7 @@ interface HeaderProps {
   userInfo?: {
     id: string
     name: string
-    email: string
+    email: string 
     avatar: string | null
   } | null
   currentPage?: string
@@ -34,7 +33,20 @@ export function Header({ userInfo, currentPage = "home", searchQuery = "", onSea
   const isPetsPage = pathname === "/pets"
   const isHomePage = pathname === "/home"
   const isPetPage = pathname.startsWith("/pet")
-  const showNewPetButton = !isPetsPage && !isHomePage && !isPetPage
+  
+  // Páginas donde se oculta la navegación
+  const hideNavigationPages = [
+    "/pets",
+    "/create-medical",
+    "/create-pet", 
+    "/update-medical",
+    "/settings",
+    "/public-pet"
+  ]
+  
+  const shouldHideNavigation = hideNavigationPages.some(page => 
+    pathname === page || pathname.startsWith(page)
+  )
 
   const handleLogout = () => {
     localStorage.removeItem("authToken")
@@ -63,7 +75,7 @@ export function Header({ userInfo, currentPage = "home", searchQuery = "", onSea
 
   const navItems = [
     { name: "Home", path: "/home", key: "home" },
-    { name: "My Profile", action: handleMyProfileClick, key: "profile" },
+    { name: "My Pet Profile", action: handleMyProfileClick, key: "profile" },
     { name: "Notifications", path: "/notifications", key: "notifications" },
   ]
 
@@ -80,51 +92,44 @@ export function Header({ userInfo, currentPage = "home", searchQuery = "", onSea
             <span className="text-white font-semibold text-xl">PetHub</span>
           </button>
 
-          {/* Navigation */}
-          {!isPetsPage && (
-          <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => (
-              <button
-                key={item.key}
-                onClick={() => (item.action ? item.action() : handleNavigation(item.path!))}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  currentPage === item.key
-                    ? "text-white bg-[#21262d]"
-                    : "text-[#8b949e] hover:text-white hover:bg-[#21262d]"
-                }`}
-              >
-                {item.name}
-              </button>
-            ))}
-          </nav>
-      )}
-          {/* Search Bar */}
-          {!isPetsPage && (
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#8b949e]" />
-              <Input
-                type="text"
-                placeholder="Search pets, breeds, or owners..."
-                value={searchQuery}
-                onChange={(e) => onSearchChange?.(e.target.value)}
-                className="w-full pl-10 bg-[#0d1117] border-[#30363d] text-white placeholder-[#8b949e] focus:border-[#1f6feb] focus:ring-[#1f6feb] h-9"
-              />
+          {/* Navigation - Oculta en páginas específicas */}
+          {!shouldHideNavigation && (
+            <nav className="hidden md:flex items-center gap-1">
+              {navItems.map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => (item.action ? item.action() : handleNavigation(item.path!))}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    currentPage === item.key
+                      ? "text-white bg-[#21262d]"
+                      : "text-[#8b949e] hover:text-white hover:bg-[#21262d]"
+                  }`}
+                >
+                  {item.name}
+                </button>
+              ))}
+            </nav>
+          )}
+
+          {/* Search Bar - Oculta en páginas específicas */}
+          {!shouldHideNavigation && (
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#8b949e]" />
+                <Input
+                  type="text"
+                  placeholder="Search pets, breeds, or owners..."
+                  value={searchQuery}
+                  onChange={(e) => onSearchChange?.(e.target.value)}
+                  className="w-full pl-10 bg-[#0d1117] border-[#30363d] text-white placeholder-[#8b949e] focus:border-[#1f6feb] focus:ring-[#1f6feb] h-9"
+                />
+              </div>
             </div>
-          </div>
-)}
+          )}
+
           {/* Actions */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            {/* New Pet Button */}
-            {showNewPetButton && (
-            <Button
-              onClick={() => handleNavigation("/create-pet")}
-              className="bg-[#238636] hover:bg-[#2ea043] text-white text-sm font-medium h-9 px-4"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              New Pet
-            </Button>
-      )}
+        
             {/* User Avatar */}
             <DropdownMenu open={showUserDropdown} onOpenChange={setShowUserDropdown}>
               <DropdownMenuTrigger asChild>
@@ -162,6 +167,14 @@ export function Header({ userInfo, currentPage = "home", searchQuery = "", onSea
                 <DropdownMenuItem onClick={handleProfileClick} className="hover:bg-[#21262d] cursor-pointer">
                   Your profile
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleNavigation("/pets")}
+                  className="hover:bg-[#21262d] cursor-pointer"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Close this profile
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-[#30363d]" />
                 <DropdownMenuItem
                   onClick={() => handleNavigation("/notifications")}
                   className="hover:bg-[#21262d] cursor-pointer"

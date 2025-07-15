@@ -109,11 +109,14 @@ export default function MyPetsPage() {
             data.map(async (pet) => {
               try {
                 const followersResponse = await makeAuthenticatedRequest(
-                  `${process.env.NEXT_PUBLIC_API_BASE_URL_UNO}/pets/${pet.id}/followers/count`,
+                  `${process.env.NEXT_PUBLIC_FOLLOWERS_API_URL_TRES}/api/v1/followers?petId=${pet.id}`,
+                  {
+                    method: "GET",
+                  }
                 )
                 if (followersResponse.ok) {
                   const followersData = await followersResponse.json()
-                  return { ...pet, followersCount: followersData.count || 0 }
+                  return { ...pet, followersCount: followersData.followers_count || 0 }
                 }
               } catch (error) {
                 console.error(`Error loading followers for pet ${pet.id}:`, error)

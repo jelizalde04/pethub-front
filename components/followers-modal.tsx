@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { X, Users, Loader2, UserPlus, UserMinus } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { makeAuthenticatedRequest } from "@/utils/auth"
-
+import { Loader2, Users, UserPlus, UserMinus } from "lucide-react"
+import Link from "next/link"
 
 interface Follower {
   id: string
@@ -18,223 +19,273 @@ interface FollowersData {
   followers: Follower[]
 }
 
-interface FollowersModalProps {
-  isOpen: boolean
-  petName: string
-  petId: string
-  onClose: () => void
+interface PetInfo {
+  id: string
+  name: string
+  image: string
 }
 
-export function FollowersModal({ isOpen, petName, petId, onClose }: FollowersModalProps) {
+interface FollowerWithImage extends Follower {
+  image: string
+  isOwnPet: boolean // Para saber si es nuestra propia mascota
+}
+
+interface FollowersModalProps {
+  isOpen: boolean
+  onClose: () => void
+  petName: string
+  petId: string
+}
+
+export function FollowersModal({ isOpen, onClose, petName, petId }: FollowersModalProps) {
   const [followersData, setFollowersData] = useState<FollowersData | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [isFollowing, setIsFollowing] = useState(false)
-  const [followingLoading, setFollowingLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [allPets, setAllPets] = useState<PetInfo[]>([])
+  const [followersWithImages, setFollowersWithImages] = useState<FollowerWithImage[]>([])
+  const [followingStates, setFollowingStates] = useState<Record<string, boolean>>({}) // Estado de seguimiento individual
+  const [followLoadingStates, setFollowLoadingStates] = useState<Record<string, boolean>>({}) // Estado de carga individual
 
   useEffect(() => {
     if (isOpen) {
-      loadFollowers()
+      setLoading(true)
+      loadFollowersData()
+      loadAllPets() // Cargar todas las mascotas para obtener sus imágenes
     }
   }, [isOpen, petId])
 
-const loadFollowers = async () => {
-  setIsLoading(true)
-  try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_FOLLOWERS_API_URL_TRES}/api/v1/followers`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          petId: petId,
-        }),
-      }
-    )
-
-    if (response.ok) {
-      const data = await response.json()
-      setFollowersData(data)
-
-      // Check if current user is following this pet
-      const selectedPetId = localStorage.getItem("selectedPetId")
-      if (selectedPetId && data.followers) {
-        const isCurrentlyFollowing = data.followers.some(
-          (follower: Follower) => follower.id === selectedPetId
-        )
-        setIsFollowing(isCurrentlyFollowing)
-      }
-    } else {
-      console.error("Error loading followers")
-      setFollowersData({ petId, followers_count: 0, followers: [] })
-    }
-  } catch (error) {
-    console.error("Error loading followers:", error)
-    setFollowersData({ petId, followers_count: 0, followers: [] })
-  } finally {
-    setIsLoading(false)
-  }
-}
-
-  const handleFollowToggle = async () => {
-    const selectedPetId = localStorage.getItem("selectedPetId")
-    if (!selectedPetId) {
-      console.error("No selected pet ID found")
-      return
-    }
-
-    setFollowingLoading(true)
-
+  const loadFollowersData = async () => {
     try {
-      if (isFollowing) {
-        // Unfollow
-        const response = await makeAuthenticatedRequest(
-  `${process.env.NEXT_PUBLIC_FOLLOWERS_API_URL_DOS}/api/v1/followers`,
-  {
-    method: "DELETE",
-    body: JSON.stringify({
-      followerId: selectedPetId,
-      petId: petId,
-    }),
-  }
-)
-
-        if (response.ok) {
-          setIsFollowing(false)
-          setFollowersData((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  followers_count: prev.followers_count - 1,
-                  followers: prev.followers.filter((follower) => follower.id !== selectedPetId),
-                }
-              : null,
-          )
-        }
+      // Usando GET con query parameters para el endpoint de seguidores
+      const response = await makeAuthenticatedRequest(
+        `${process.env.NEXT_PUBLIC_FOLLOWERS_API_URL_TRES}/api/v1/followers?petId=${petId}`,
+        {
+          method: "GET",
+        },
+      )
+      if (response.ok) {
+        const data = await response.json()
+        console.log("Followers Data from API:", data) // Debugging
+        setFollowersData(data)
       } else {
-        // Follow
-        const response = await makeAuthenticatedRequest(
-  `${process.env.NEXT_PUBLIC_FOLLOWERS_API_URL_UNO}/api/v1/followers`,
-  {
-    method: "POST",
-    body: JSON.stringify({
-      followerId: selectedPetId,
-      petId: petId,
-    }),
-  }
-)
-        if (response.ok) {
-          setIsFollowing(true)
-          setFollowersData((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  followers_count: prev.followers_count + 1,
-                  followers: [
-                    ...prev.followers,
-                    {
-                      id: selectedPetId,
-                      name: "You",
-                      created_at: new Date().toISOString(),
-                    },
-                  ],
-                }
-              : null,
-          )
-        }
+        console.error("Error loading followers data, status:", response.status)
+        setFollowersData({ petId, followers_count: 0, followers: [] })
       }
     } catch (error) {
-      console.error("Error toggling follow:", error)
+      console.error("Error loading followers data:", error)
+      setFollowersData({ petId, followers_count: 0, followers: [] })
     } finally {
-      setFollowingLoading(false)
+      setLoading(false)
     }
   }
 
-  const formatTimeAgo = (dateString: string) => {
-    const now = new Date()
-    const date = new Date(dateString)
-    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
-
-    if (diffInDays === 0) return "today"
-    if (diffInDays === 1) return "yesterday"
-    if (diffInDays < 7) return `${diffInDays} days ago`
-    if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`
-    return `${Math.floor(diffInDays / 30)} months ago`
+  const loadAllPets = async () => {
+    try {
+      // Este endpoint no requiere autenticación, se usa fetch directamente
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL_UNO}/pets/all`, {
+        method: "GET",
+      })
+      if (response.ok) {
+        const data = await response.json()
+        console.log("All Pets Data from API:", data) // Debugging
+        setAllPets(data.pets || []) // Asegúrate de que 'data.pets' es el array correcto
+      } else {
+        console.error("Error loading all pets, status:", response.status)
+        setAllPets([])
+      }
+    } catch (error) {
+      console.error("Error loading all pets:", error)
+      setAllPets([])
+    }
   }
 
-  if (!isOpen) return null
+  // Función para verificar si estamos siguiendo a cada mascota individual
+  const checkFollowingStates = async (followerIds: string[]) => {
+    const selectedPetId = localStorage.getItem("selectedPetId")
+    if (!selectedPetId) return
+
+    const states: Record<string, boolean> = {}
+    for (const targetPetId of followerIds) {
+      try {
+        // Este endpoint de verificación de seguimiento también es GET con query parameters
+        const response = await makeAuthenticatedRequest(
+          `${process.env.NEXT_PUBLIC_FOLLOWERS_API_URL_TRES}/api/v1/followers?petId=${targetPetId}`,
+          {
+            method: "GET",
+          },
+        )
+        if (response.ok) {
+          const data = await response.json()
+          // Verificar si nuestra mascota está en la lista de seguidores de targetPetId
+          const isFollowing = data.followers?.some((follower: any) => follower.id === selectedPetId) || false
+          states[targetPetId] = isFollowing
+        } else {
+          states[targetPetId] = false
+        }
+      } catch (error) {
+        console.error(`Error checking follow state for ${targetPetId}:`, error)
+        states[targetPetId] = false
+      }
+    }
+    setFollowingStates(states)
+  }
+
+  // Función para combinar followers con sus imágenes y verificar estados de seguimiento
+  useEffect(() => {
+    console.log("useEffect: followersData changed", followersData) // Debugging
+    console.log("useEffect: allPets changed", allPets) // Debugging
+
+    if (followersData && allPets.length > 0) {
+      const selectedPetId = localStorage.getItem("selectedPetId")
+      const followersWithImagesData = followersData.followers.map((follower) => {
+        const petData = allPets.find((pet) => pet.id === follower.id)
+        console.log(`Finding pet for follower ${follower.id}:`, petData) // Debugging
+        const isOwnPetFollower = follower.id === selectedPetId // Si el follower es nuestra propia mascota
+        return {
+          id: follower.id,
+          name: follower.name,
+          image: petData?.image || "/placeholder.svg?height=40&width=40", // Usar imagen real o placeholder
+          created_at: follower.created_at,
+          isOwnPet: isOwnPetFollower,
+        }
+      })
+      setFollowersWithImages(followersWithImagesData)
+
+      // Verificar estados de seguimiento para cada follower (excepto nuestra propia mascota)
+      const followerIdsToCheck = followersWithImagesData.filter((f) => !f.isOwnPet).map((f) => f.id)
+      if (followerIdsToCheck.length > 0) {
+        checkFollowingStates(followerIdsToCheck)
+      }
+    } else if (followersData && allPets.length === 0 && !loading) {
+      // Si no hay mascotas cargadas (o allPets está vacío) pero ya terminamos de cargar,
+      // mostrar solo nombres con placeholder. Esto cubre el caso donde allPets falla.
+      const followersWithoutImages = followersData.followers.map((follower) => ({
+        id: follower.id,
+        name: follower.name,
+        image: "/placeholder.svg?height=40&width=40", // Usar placeholder si no hay imágenes de mascotas
+        created_at: follower.created_at,
+        isOwnPet: follower.id === localStorage.getItem("selectedPetId"),
+      }))
+      setFollowersWithImages(followersWithoutImages)
+    }
+  }, [followersData, allPets, loading])
+
+  // Función para manejar follow/unfollow individual de cada mascota en la lista
+  const handleIndividualFollowToggle = async (targetPetId: string, isCurrentlyFollowing: boolean) => {
+    const selectedPetId = localStorage.getItem("selectedPetId")
+    if (!selectedPetId || followLoadingStates[targetPetId]) return
+
+    setFollowLoadingStates((prev) => ({ ...prev, [targetPetId]: true }))
+
+    try {
+      let response
+      if (isCurrentlyFollowing) {
+        // Unfollow
+        response = await makeAuthenticatedRequest(`${process.env.NEXT_PUBLIC_FOLLOWERS_API_URL_DOS}/api/v1/followers`, {
+          method: "DELETE",
+          body: JSON.stringify({
+            followerId: selectedPetId,
+            petId: targetPetId,
+          }),
+        })
+      } else {
+        // Follow
+        response = await makeAuthenticatedRequest(`${process.env.NEXT_PUBLIC_FOLLOWERS_API_URL_UNO}/api/v1/followers`, {
+          method: "POST",
+          body: JSON.stringify({
+            followerId: selectedPetId,
+            petId: targetPetId,
+          }),
+        })
+      }
+
+      if (response.ok) {
+        setFollowingStates((prev) => ({ ...prev, [targetPetId]: !isCurrentlyFollowing }))
+        // Opcional: Recargar el conteo de seguidores si es necesario
+        // loadFollowersData();
+      } else {
+        console.error("Error toggling individual follow, status:", response.status)
+      }
+    } catch (error) {
+      console.error("Error toggling individual follow:", error)
+    } finally {
+      setFollowLoadingStates((prev) => ({ ...prev, [targetPetId]: false }))
+    }
+  }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#161b22] border border-[#30363d] rounded-lg w-full max-w-md max-h-[80vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-[#30363d]">
-          <div className="flex items-center gap-3">
-            <Users className="h-5 w-5 text-[#58a6ff]" />
-            <h2 className="text-lg font-semibold text-white">
-              {petName}'s Followers ({followersData?.followers_count || 0})
-            </h2>
-          </div>
-          <button onClick={onClose} className="text-[#8b949e] hover:text-white transition-colors">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        {/* Follow/Unfollow Button */}
-        <div className="p-4 border-b border-[#30363d]">
-          <Button
-            onClick={handleFollowToggle}
-            disabled={followingLoading}
-            className={`w-full ${
-              isFollowing
-                ? "bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-white"
-                : "bg-[#238636] hover:bg-[#2ea043] text-white"
-            }`}
-          >
-            {followingLoading ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : isFollowing ? (
-              <UserMinus className="h-4 w-4 mr-2" />
-            ) : (
-              <UserPlus className="h-4 w-4 mr-2" />
-            )}
-            {followingLoading ? "Loading..." : isFollowing ? "Unfollow" : "Follow"}
-          </Button>
-        </div>
-
-        {/* Content */}
-        <div className="p-4">
-          {isLoading ? (
-            <div className="text-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-white mx-auto mb-2" />
-              <p className="text-[#8b949e]">Loading followers...</p>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px] bg-[#161b22] text-white border border-[#30363d]">
+        <DialogHeader className="border-b border-[#30363d] pb-4">
+          <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+            <Users className="h-6 w-6 text-[#58a6ff]" />
+            {petName}'s Followers ({followersData?.followers_count || 0})
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-4 max-h-[60vh] overflow-y-auto">
+          {loading ? (
+            <div className="flex justify-center items-center h-32">
+              <Loader2 className="h-8 w-8 animate-spin text-[#58a6ff]" />
             </div>
-          ) : !followersData || followersData.followers.length === 0 ? (
-            <div className="text-center py-8">
-              <Users className="h-12 w-12 text-[#30363d] mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-white mb-2">No followers yet</h3>
-              <p className="text-[#8b949e] text-sm">When people start following {petName}, they'll appear here.</p>
+          ) : followersWithImages.length === 0 ? (
+            <div className="text-center text-[#8b949e] py-8">
+              <p>No followers yet.</p>
             </div>
           ) : (
-            <div className="space-y-3 max-h-[400px] overflow-y-auto">
-              {followersData.followers.map((follower) => (
-                <div key={follower.id} className="flex items-center justify-between p-3 bg-[#21262d] rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#30363d] flex items-center justify-center">
-                      <Users className="h-5 w-5 text-[#8b949e]" />
-                    </div>
-                    <div>
-                      <p className="text-white font-medium">{follower.name}</p>
-                      <p className="text-[#8b949e] text-sm">Followed {formatTimeAgo(follower.created_at)}</p>
-                    </div>
+            <div className="space-y-4">
+              {followersWithImages.map((follower) => {
+                const isCurrentlyFollowing = followingStates[follower.id] || false
+                const isLoadingIndividual = followLoadingStates[follower.id] || false
+                const selectedPetId = localStorage.getItem("selectedPetId")
+                const isOwnPet = follower.id === selectedPetId // Si el follower es la mascota actualmente seleccionada
+
+                return (
+                  <div
+                    key={follower.id}
+                    className="flex items-center justify-between gap-4 bg-[#21262d] p-3 rounded-lg border border-[#30363d]"
+                  >
+                    <Link
+                      href={`/public-pet/${follower.id}`}
+                      className="flex items-center gap-3 flex-grow hover:text-[#58a6ff] transition-colors"
+                    >
+                      <img
+                        src={follower.image || "/placeholder.svg?height=40&width=40"}
+                        alt={follower.name}
+                        className="w-10 h-10 rounded-full object-cover border-2 border-[#30363d]"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = "/placeholder.svg?height=40&width=40"
+                        }}
+                      />
+                      <span className="font-medium text-white">{follower.name}</span>
+                    </Link>
+                    {!isOwnPet &&
+                      selectedPetId && ( // Mostrar botón solo si no es nuestra propia mascota y hay una mascota seleccionada
+                        <Button
+                          onClick={() => handleIndividualFollowToggle(follower.id, isCurrentlyFollowing)}
+                          disabled={isLoadingIndividual}
+                          className={`h-8 px-3 text-sm ${
+                            isCurrentlyFollowing
+                              ? "bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-white"
+                              : "bg-[#238636] hover:bg-[#2ea043] text-white"
+                          }`}
+                        >
+                          {isLoadingIndividual ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : isCurrentlyFollowing ? (
+                            <UserMinus className="h-4 w-4 mr-1" />
+                          ) : (
+                            <UserPlus className="h-4 w-4 mr-1" />
+                          )}
+                          {isLoadingIndividual ? "" : isCurrentlyFollowing ? "Unfollow" : "Follow"}
+                        </Button>
+                      )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

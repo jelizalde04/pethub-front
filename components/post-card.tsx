@@ -66,7 +66,7 @@ export function PostCard({ post, petName, petImage, onEdit, onDelete, disableLik
     try {
       if (liked) {
         // Remove like
-        const response = await makeAuthenticatedRequest("http://54.146.149.107:6002/likes/remove", {
+        const response = await makeAuthenticatedRequest(`${process.env.NEXT_PUBLIC_API_BASE_URL_DOS}/likes/remove`, {
           method: "DELETE",
           body: JSON.stringify({
             postId: post.id,
@@ -80,7 +80,7 @@ export function PostCard({ post, petName, petImage, onEdit, onDelete, disableLik
         }
       } else {
         // Add like
-        const response = await makeAuthenticatedRequest("http://54.146.149.107:6001/likes/add", {
+        const response = await makeAuthenticatedRequest(`${process.env.NEXT_PUBLIC_API_BASE_URL_DOS}/likes/add`, {
           method: "POST",
           body: JSON.stringify({
             postId: post.id,

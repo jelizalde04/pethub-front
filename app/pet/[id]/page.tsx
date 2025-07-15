@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import { Loader2, ArrowLeft, MapPin, Calendar, Users, PawPrint, Edit, Award, Trash2, Palette } from "lucide-react"
+import { Loader2, MapPin, Calendar, Users, PawPrint, Edit, Award, Trash2, Palette } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { makeAuthenticatedRequest } from "@/utils/auth"
 import { Header } from "@/components/header"
@@ -15,6 +15,7 @@ import { CreatePostModal } from "@/components/create-post-modal"
 import { CreatePostBox } from "@/components/create-post-box"
 import { EditPetModal } from "@/components/edit-pet-modal"
 import { MedicalRecordSection } from "@/components/medical-record-section"
+import { useSearch } from "@/hooks/useSearch"
 
 interface Responsible {
   id: string
@@ -70,6 +71,14 @@ export default function PetProfilePage() {
   const [userInfo, setUserInfo] = useState<Responsible | null>(null)
   const [isOwner, setIsOwner] = useState(false)
   const [followersCount, setFollowersCount] = useState(0)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  // Hook de búsqueda
+  const { filteredData: filteredPosts, totalResults } = useSearch({
+    data: posts,
+    searchFields: ['content'],
+    searchQuery
+  })
 
   // Modal states
   const [editPostModal, setEditPostModal] = useState<{ isOpen: boolean; post: Post | null }>({
@@ -86,7 +95,6 @@ export default function PetProfilePage() {
   const [editPetModal, setEditPetModal] = useState(false)
 
   useEffect(() => {
-    // Check if user is authenticated
     const authToken = localStorage.getItem("authToken")
     if (!authToken) {
       window.location.href = "/login"
@@ -127,7 +135,6 @@ export default function PetProfilePage() {
         if (result.success && result.data) {
           setPet(result.data)
 
-          // If the responsible contact is not included, fetch it separately
           if (!result.data.responsible.contact && result.data.responsibleId) {
             try {
               const responsibleResponse = await makeAuthenticatedRequest(
@@ -136,7 +143,6 @@ export default function PetProfilePage() {
               if (responsibleResponse.ok) {
                 const responsibleData = await responsibleResponse.json()
                 if (responsibleData.responsible && responsibleData.responsible.id === result.data.responsibleId) {
-                  // Update the pet data with complete responsible info
                   setPet({
                     ...result.data,
                     responsible: {
@@ -172,49 +178,52 @@ export default function PetProfilePage() {
     }
   }
 
-const loadPetPosts = async () => {
-  try {
-    setLoadingPosts(true)
-    console.log("Loading posts for pet ID:", petId)
+  const loadPetPosts = async () => {
+    try {
+      setLoadingPosts(true)
+      console.log("Loading posts for pet ID:", petId)
 
-    const response = await makeAuthenticatedRequest(`${process.env.NEXT_PUBLIC_API_BASE_URL_UNO}/posts/pet/${petId}`)
+      const response = await makeAuthenticatedRequest(`${process.env.NEXT_PUBLIC_API_BASE_URL_UNO}/posts/pet/${petId}`)
 
-    if (response.ok) {
-      const postsData = await response.json()
-      console.log("Posts data received:", postsData)
+      if (response.ok) {
+        const postsData = await response.json()
+        console.log("Posts data received:", postsData)
 
-      // Asegurar que cada post tenga petId y luego ordenar
-      const postsWithPetId = Array.isArray(postsData)
-        ? postsData.map(post => ({
-            ...post,
-            petId: petId // Agregar petId a cada post
-          }))
-        : []
+        const postsWithPetId = Array.isArray(postsData)
+          ? postsData.map((post) => ({
+              ...post,
+              petId: petId,
+            }))
+          : []
 
-      // Sort posts by creation date (newest first)
-      const sortedPosts = postsWithPetId.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        const sortedPosts = postsWithPetId.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )
 
-      setPosts(sortedPosts)
-    } else {
-      console.error("Error loading posts, status:", response.status)
+        setPosts(sortedPosts)
+      } else {
+        console.error("Error loading posts, status:", response.status)
+        setPosts([])
+      }
+    } catch (error) {
+      console.error("Error loading posts:", error)
       setPosts([])
+    } finally {
+      setLoadingPosts(false)
     }
-  } catch (error) {
-    console.error("Error loading posts:", error)
-    setPosts([])
-  } finally {
-    setLoadingPosts(false)
   }
-}
 
   const loadFollowersCount = async () => {
     try {
       const response = await makeAuthenticatedRequest(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL_UNO}/pets/${petId}/followers/count`,
+        `${process.env.NEXT_PUBLIC_FOLLOWERS_API_URL_TRES}/api/v1/followers?petId=${petId}`,
+        {
+          method: "GET",
+        },
       )
       if (response.ok) {
         const data = await response.json()
-        setFollowersCount(data.count || 0)
+        setFollowersCount(data.followers_count || 0)
       }
     } catch (error) {
       console.error("Error loading followers count:", error)
@@ -222,7 +231,6 @@ const loadPetPosts = async () => {
     }
   }
 
-  // Check ownership when both userInfo and pet are loaded
   useEffect(() => {
     if (userInfo && pet) {
       setIsOwner(userInfo.id === pet.responsibleId)
@@ -277,7 +285,6 @@ const loadPetPosts = async () => {
         setPosts((prevPosts) => prevPosts.filter((post) => post.id !== deletePostModal.postId))
         setDeletePostModal({ isOpen: false, postId: null })
 
-        // Show success message briefly
         const successDiv = document.createElement("div")
         successDiv.className = "fixed top-4 right-4 bg-[#238636] text-white px-4 py-2 rounded-lg z-50"
         successDiv.textContent = "Post deleted successfully!"
@@ -300,12 +307,14 @@ const loadPetPosts = async () => {
     if (!pet) return
 
     try {
-      const response = await makeAuthenticatedRequest(`${process.env.NEXT_PUBLIC_API_BASE_URL_UNO}/pets/delete/${pet.id}`, {
-        method: "DELETE",
-      })
+      const response = await makeAuthenticatedRequest(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL_UNO}/pets/delete/${pet.id}`,
+        {
+          method: "DELETE",
+        },
+      )
 
       if (response.ok) {
-        // Show success message briefly
         const successDiv = document.createElement("div")
         successDiv.className = "fixed top-4 right-4 bg-[#238636] text-white px-4 py-2 rounded-lg z-50"
         successDiv.textContent = `${pet.name}'s profile has been deleted successfully!`
@@ -328,7 +337,11 @@ const loadPetPosts = async () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0d1117]">
-        <Header userInfo={userInfo} />
+        <Header 
+          userInfo={userInfo}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-white" />
         </div>
@@ -339,16 +352,17 @@ const loadPetPosts = async () => {
   if (error || !pet) {
     return (
       <div className="min-h-screen bg-[#0d1117]">
-        <Header userInfo={userInfo} />
+        <Header 
+          userInfo={userInfo}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <PawPrint className="h-16 w-16 text-[#30363d] mx-auto mb-4" />
             <h1 className="text-2xl font-semibold text-white mb-2">Pet not found</h1>
             <p className="text-[#8b949e] mb-6">{error || "The pet you're looking for doesn't exist."}</p>
-            <Button onClick={handleBack} className="bg-[#238636] hover:bg-[#2ea043] text-white">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to My Pets
-            </Button>
+            {/* Removed the "Back to My Pets" button as requested */}
           </div>
         </div>
       </div>
@@ -357,15 +371,19 @@ const loadPetPosts = async () => {
 
   return (
     <div className="min-h-screen bg-[#0d1117]">
-      <Header userInfo={userInfo} />
+      <Header 
+        userInfo={userInfo}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
 
-      {/* Hero Section */}
       <div className="relative bg-gradient-to-r from-[#161b22] to-[#21262d] border-b border-[#30363d]">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <div className="flex items-center gap-4 mb-6">
-            <button onClick={handleBack} className="text-[#8b949e] hover:text-white transition-colors">
+            {/* This is the button that was removed */}
+            {/* <button onClick={handleBack} className="text-[#8b949e] hover:text-white transition-colors">
               <ArrowLeft className="h-5 w-5" />
-            </button>
+            </button> */}
             <div className="flex items-center gap-2">
               <PawPrint className="h-6 w-6 text-[#58a6ff]" />
               <span className="text-[#8b949e] text-sm">Pet Profile</span>
@@ -373,7 +391,6 @@ const loadPetPosts = async () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Pet Image - Mejorada */}
             <div className="lg:col-span-1">
               <div className="w-full aspect-square max-w-sm mx-auto rounded-2xl overflow-hidden bg-[#21262d] border-2 border-[#30363d]">
                 <img
@@ -388,7 +405,6 @@ const loadPetPosts = async () => {
               </div>
             </div>
 
-            {/* Pet Info and Details */}
             <div className="lg:col-span-1">
               <div className="flex items-start justify-between mb-6">
                 <div>
@@ -423,7 +439,6 @@ const loadPetPosts = async () => {
                 )}
               </div>
 
-              {/* Compact Pet Details */}
               <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-4 mb-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-3">
@@ -467,7 +482,6 @@ const loadPetPosts = async () => {
                 </div>
               </div>
 
-              {/* Followers Section - Horizontal */}
               <div className="bg-[#21262d] border border-[#30363d] rounded-lg p-4 mb-6">
                 <button
                   onClick={() => setFollowersModal(true)}
@@ -481,7 +495,6 @@ const loadPetPosts = async () => {
                 </button>
               </div>
 
-              {/* Action Buttons - Only show Follow if not owner */}
               {!isOwner && (
                 <div className="flex gap-3">
                   <Button className="flex-1 bg-[#238636] hover:bg-[#2ea043] text-white">
@@ -495,16 +508,19 @@ const loadPetPosts = async () => {
         </div>
       </div>
 
-      {/* Content Section */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Posts Section */}
             <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-white mb-4">Posts</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-white">Posts</h2>
+                {searchQuery && (
+                  <span className="text-sm text-[#8b949e]">
+                    {totalResults} results for "{searchQuery}"
+                  </span>
+                )}
+              </div>
 
-              {/* Create Post Box - Only show if owner */}
               {isOwner && (
                 <CreatePostBox petName={pet.name} petImage={pet.image} onClick={() => setCreatePostModal(true)} />
               )}
@@ -514,7 +530,7 @@ const loadPetPosts = async () => {
                   <Loader2 className="h-8 w-8 animate-spin text-white mx-auto mb-2" />
                   <p className="text-[#8b949e]">Loading posts...</p>
                 </div>
-              ) : posts.length === 0 ? (
+              ) : filteredPosts.length === 0 && !searchQuery ? (
                 <div className="text-center py-8">
                   <PawPrint className="h-12 w-12 text-[#30363d] mx-auto mb-3" />
                   <p className="text-[#8b949e]">No posts yet</p>
@@ -524,9 +540,17 @@ const loadPetPosts = async () => {
                       : "This pet hasn't shared anything yet."}
                   </p>
                 </div>
+              ) : searchQuery && filteredPosts.length === 0 ? (
+                <div className="text-center py-8">
+                  <PawPrint className="h-12 w-12 text-[#30363d] mx-auto mb-3" />
+                  <p className="text-[#8b949e]">No posts found</p>
+                  <p className="text-[#6e7681] text-sm">
+                    No posts found for "{searchQuery}". Try a different search term.
+                  </p>
+                </div>
               ) : (
                 <div className="space-y-4">
-                  {posts.map((post) => (
+                  {filteredPosts.map((post) => (
                     <PostCard
                       key={post.id}
                       post={post}
@@ -542,9 +566,7 @@ const loadPetPosts = async () => {
             </div>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Owner Info */}
             <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-6">
               <h3 className="text-lg font-semibold text-white mb-4">Owner</h3>
               <div className="space-y-4">
@@ -564,7 +586,6 @@ const loadPetPosts = async () => {
                   </div>
                 </div>
 
-                {/* Phone Number - Always show if exists */}
                 {pet.responsible.contact && (
                   <div className="pt-2 border-t border-[#30363d]">
                     <p className="text-sm text-[#8b949e] mb-2">Contact</p>
@@ -574,13 +595,11 @@ const loadPetPosts = async () => {
               </div>
             </div>
 
-            {/* Medical Record Section */}
             <MedicalRecordSection petId={pet.id} isOwner={isOwner} />
           </div>
         </div>
       </div>
 
-      {/* Modals */}
       <EditPostModal
         post={editPostModal.post}
         isOpen={editPostModal.isOpen}

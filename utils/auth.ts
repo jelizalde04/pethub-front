@@ -23,7 +23,7 @@ export const isAuthenticated = (): boolean => {
 }
 
 // Function to make authenticated API requests
-export const makeAuthenticatedRequest = async (url: string, options: RequestInit = {}) => {
+export const makeAuthenticatedRequest = async (url: string, options: RequestInit = {}, authPrefix = "Bearer ") => {
   const token = getAuthToken()
 
   console.log("makeAuthenticatedRequest called with:")
@@ -36,7 +36,7 @@ export const makeAuthenticatedRequest = async (url: string, options: RequestInit
   }
 
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
+    Authorization: `${authPrefix}${token}`, // Use the prefix here
     ...((options.headers as Record<string, string>) || {}),
   }
 

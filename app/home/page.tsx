@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Header } from "@/components/header"
 import { makeAuthenticatedRequest } from "@/utils/auth"
+import { useSearch } from "@/hooks/useSearch"
 
 interface Responsible {
   id: string
@@ -62,25 +63,36 @@ export default function HomePage() {
   const [posts, setPosts] = useState<PostWithPet[]>([])
   const [pets, setPets] = useState<Pet[]>([])
   const [loadingPosts, setLoadingPosts] = useState(true)
+  // likedPosts will now only track likes made in the current session
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set())
+  const [selectedPetId, setSelectedPetId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  // Hook de búsqueda
+  const { filteredData: filteredPosts, totalResults } = useSearch({
+    data: posts,
+    searchFields: ['content', 'pet.name', 'pet.breed', 'pet.species', 'pet.responsible.name'],
+    searchQuery
+  })
 
   useEffect(() => {
-    // Check if user is authenticated and has selected a pet
     const authToken = localStorage.getItem("authToken")
-    const selectedPetId = localStorage.getItem("selectedPetId")
+    const currentSelectedPetId = localStorage.getItem("selectedPetId")
 
     if (!authToken) {
       window.location.href = "/login"
       return
     }
 
-    if (!selectedPetId) {
+    if (!currentSelectedPetId) {
       window.location.href = "/pets"
       return
     }
+    setSelectedPetId(currentSelectedPetId)
 
     loadUserInfo()
     loadGlobalFeed()
+    // Removed loadLikedPosts function as the endpoint is not valid for initial load
   }, [])
 
   const loadUserInfo = async () => {
@@ -101,23 +113,19 @@ export default function HomePage() {
     try {
       setLoadingPosts(true)
 
-      // Load all pets
       const petsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL_UNO}/pets/all`)
       const petsData = await petsResponse.json()
       setPets(Array.isArray(petsData) ? petsData : [])
 
-      // Load all posts
       const postsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL_UNO}/posts/all`)
       const postsData = await postsResponse.json()
 
       if (Array.isArray(postsData) && Array.isArray(petsData)) {
-        // Combine posts with pet information
         const postsWithPets = postsData.map((post) => {
           const pet = petsData.find((p) => p.id === post.petId)
           return { ...post, pet }
         })
 
-        // Sort by creation date (newest first)
         const sortedPosts = postsWithPets.sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         )
@@ -132,20 +140,26 @@ export default function HomePage() {
     }
   }
 
-  const handleLike = async (postId: string) => {
-    const selectedPetId = localStorage.getItem("selectedPetId")
-    if (!selectedPetId) return
+  // loadLikedPosts function removed as per user's request (endpoint not valid for initial load)
+
+  const handleLike = async (postId: string, postPetId: string) => {
+    if (!selectedPetId) {
+      console.error("No selected pet ID found for liking.")
+      return
+    }
+
+    if (selectedPetId === postPetId) {
+      console.warn("Cannot like your own post.")
+      return
+    }
 
     const isLiked = likedPosts.has(postId)
 
     try {
       if (isLiked) {
-        // Remove like
-        const response = await fetch("http://54.146.149.107:6002/likes/remove", {
+        // Attempt to remove like
+        const response = await makeAuthenticatedRequest(`${process.env.NEXT_PUBLIC_API_BASE_URL_DOS}/likes/remove`, {
           method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             postId: postId,
             petId: selectedPetId,
@@ -159,14 +173,23 @@ export default function HomePage() {
             return newSet
           })
           setPosts((prev) => prev.map((post) => (post.id === postId ? { ...post, likes: post.likes - 1 } : post)))
+        } else {
+          const errorText = await response.text()
+          console.error("Error removing like:", response.status, errorText)
+          // If backend says like doesn't exist, ensure client state reflects that
+          if (response.status === 400 && errorText.includes("Like does not exist")) {
+            setLikedPosts((prev) => {
+              const newSet = new Set(prev)
+              newSet.delete(postId)
+              return newSet
+            })
+            // No need to decrement likes if it didn't exist on backend
+          }
         }
       } else {
-        // Add like
-        const response = await fetch("http://54.146.149.107:6001/likes/add", {
+        // Attempt to add like
+        const response = await makeAuthenticatedRequest(`${process.env.NEXT_PUBLIC_API_BASE_URL_DOS}/likes/add`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             postId: postId,
             petId: selectedPetId,
@@ -176,6 +199,14 @@ export default function HomePage() {
         if (response.ok) {
           setLikedPosts((prev) => new Set(prev).add(postId))
           setPosts((prev) => prev.map((post) => (post.id === postId ? { ...post, likes: post.likes + 1 } : post)))
+        } else {
+          const errorText = await response.text()
+          console.error("Error adding like:", response.status, errorText)
+          // If backend says like already exists, ensure client state reflects that
+          if (response.status === 400 && errorText.includes("Like already exists")) {
+            setLikedPosts((prev) => new Set(prev).add(postId))
+            // No need to increment likes if it already existed on backend
+          }
         }
       }
     } catch (error) {
@@ -218,23 +249,31 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#0d1117]">
-      <Header userInfo={userInfo} currentPage="home" />
+      <Header 
+        userInfo={userInfo} 
+        currentPage="home"
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Welcome Section */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Welcome to PetHub Community! 🐾</h1>
           <p className="text-[#8b949e] text-lg">Discover amazing pets and their stories from around the world</p>
+          {searchQuery && (
+            <div className="mt-4 text-[#8b949e]">
+              {totalResults} results for "{searchQuery}"
+            </div>
+          )}
         </div>
 
-        {/* Global Feed */}
         <div className="space-y-6">
           {loadingPosts ? (
             <div className="text-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-white mx-auto mb-4" />
               <p className="text-[#8b949e]">Loading community posts...</p>
             </div>
-          ) : posts.length === 0 ? (
+          ) : filteredPosts.length === 0 && !searchQuery ? (
             <Card className="bg-[#161b22] border-[#30363d]">
               <CardContent className="p-12 text-center">
                 <MessageCircle className="h-16 w-16 text-[#30363d] mx-auto mb-4" />
@@ -242,11 +281,18 @@ export default function HomePage() {
                 <p className="text-[#8b949e]">Be the first to share something amazing!</p>
               </CardContent>
             </Card>
+          ) : searchQuery && filteredPosts.length === 0 ? (
+            <Card className="bg-[#161b22] border-[#30363d]">
+              <CardContent className="p-12 text-center">
+                <MessageCircle className="h-16 w-16 text-[#30363d] mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">No results found</h3>
+                <p className="text-[#8b949e]">No posts found for "{searchQuery}". Try a different search term.</p>
+              </CardContent>
+            </Card>
           ) : (
-            posts.map((post) => (
+            filteredPosts.map((post) => (
               <Card key={post.id} className="bg-[#161b22] border-[#30363d] hover:border-[#58a6ff]/30 transition-colors">
                 <CardContent className="p-6">
-                  {/* Post Header */}
                   <div className="flex items-center gap-4 mb-4">
                     <div className="relative">
                       <img
@@ -298,33 +344,33 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  {/* Post Content */}
                   <div className="mb-4">
                     <p className="text-white leading-relaxed whitespace-pre-wrap mb-4">{post.content}</p>
 
-                    {/* Post Image */}
-                    {post.image && (
-                      <div className="rounded-lg overflow-hidden border border-[#30363d]">
-                        <img
-                          src={post.image || "/placeholder.svg?height=300&width=400"}
-                          alt="Post image"
-                          className="w-full h-auto max-h-96 object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.src = "/placeholder.svg?height=300&width=400"
-                          }}
-                        />
-                      </div>
-                    )}
+                 {post.image && (
+  <div className="rounded-lg overflow-hidden border border-[#30363d] mt-3">
+    <div className="relative bg-[#0d1117] flex items-center justify-center min-h-[250px]">
+      <img
+        src={post.image}
+        alt="Post image"
+        className="max-w-full max-h-[500px] w-auto h-auto object-contain"
+        onError={(e) => {
+          const target = e.target as HTMLImageElement
+          target.src = "/placeholder.svg?height=300&width=400"
+        }}
+      />
+    </div>
+  </div>
+)}
                   </div>
 
-                  {/* Post Actions */}
                   <div className="flex items-center gap-6 pt-4 border-t border-[#30363d]">
                     <button
-                      onClick={() => handleLike(post.id)}
+                      onClick={() => post.petId && handleLike(post.id, post.petId)}
+                      disabled={selectedPetId === post.petId}
                       className={`flex items-center gap-2 transition-colors ${
                         likedPosts.has(post.id) ? "text-[#f85149]" : "text-[#8b949e] hover:text-[#f85149]"
-                      }`}
+                      } ${selectedPetId === post.petId ? "opacity-50 cursor-not-allowed" : ""}`}
                     >
                       <Heart className={`h-5 w-5 ${likedPosts.has(post.id) ? "fill-current" : ""}`} />
                       <span className="font-medium">{post.likes}</span>
@@ -349,8 +395,7 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Load More Button */}
-        {posts.length > 0 && (
+        {filteredPosts.length > 0 && (
           <div className="text-center mt-8">
             <Button
               onClick={loadGlobalFeed}

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { makeAuthenticatedRequest } from "@/utils/auth"
+import { makeAuthenticatedRequest } from "@/utils/auth" // Import getAuthToken if needed for direct header
 import { Header } from "@/components/header"
 
 export default function CreateMedicalRecordPage() {
@@ -55,10 +55,15 @@ export default function CreateMedicalRecordPage() {
         sterilized: formData.sterilized,
       }
 
-      const response = await makeAuthenticatedRequest(`${process.env.NEXT_PUBLIC_API_BASE_URL_DOS}/medical/create`, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      })
+      // Use NEXT_PUBLIC_MEDICAL_API_URL_UNO and send token directly
+      const response = await makeAuthenticatedRequest(
+        `${process.env.NEXT_PUBLIC_MEDICAL_API_URL_UNO}/medical/create`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        },
+        "", // Pass empty string as authPrefix to send token directly without "Bearer "
+      )
 
       if (response.ok) {
         // Show success message
@@ -72,8 +77,15 @@ export default function CreateMedicalRecordPage() {
           window.location.href = `/pet/${petId}`
         }, 2000)
       } else {
-        const errorData = await response.json()
-        alert(`Error creating medical record: ${errorData.message || "Please try again."}`)
+        let errorMessage = "Please try again."
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.message || errorMessage
+        } catch (jsonError) {
+          // If response is not JSON, use status text or a generic message
+          errorMessage = response.statusText || "An unknown error occurred."
+        }
+        alert(`Error creating medical record: ${errorMessage}`)
       }
     } catch (error) {
       console.error("Error creating medical record:", error)
