@@ -7,7 +7,6 @@ RUN npm install --omit=dev
 
 COPY . .
 
-# Copiar el archivo de entorno, si existe
 COPY .env.production .env.production
 
 RUN npm run build
