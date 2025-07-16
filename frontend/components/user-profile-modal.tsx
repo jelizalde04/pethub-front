@@ -147,14 +147,6 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                   </div>
                 </div>
               </div>
-
-              {/* Actions */}
-              <div className="flex gap-3">
-                <Button onClick={handleSettings} className="flex-1 bg-[#238636] hover:bg-[#2ea043] text-white">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </Button>
-              </div>
             </div>
           ) : (
             <div className="text-center py-8">

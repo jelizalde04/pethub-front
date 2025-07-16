@@ -50,105 +50,115 @@ export default function NotificationsPage() {
   })
 
   // Fetch user info for header
-  const fetchUserInfo = useCallback(async () => {
-    try {
-      const token = localStorage.getItem("authToken")
-      const userId = getUserIdFromToken()
+    const fetchUserInfo = useCallback(async () => {
+  try {
+    const token = localStorage.getItem("authToken")
+    if (!token) return null
 
-      if (!token || !userId) return
+    const response = await fetch(`${API_BASE_URL}/responsibles/getId`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    })
 
-      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (response.ok) {
-        const userData = await response.json()
-        setUserInfo(userData)
-      }
-    } catch (err) {
-      console.warn("Error fetching user info:", err)
+    if (response.ok) {
+      const data = await response.json()
+      setUserInfo(data.responsible)
+      return data.responsible.id
+    } else {
+      return null
     }
-  }, [API_BASE_URL])
+  } catch (err) {
+    console.warn("Error fetching user info:", err)
+    return null
+  }
+}, [API_BASE_URL])
 
-  const fetchNotifications = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    const userId = getUserIdFromToken()
+const fetchNotifications = useCallback(async () => {
+  setLoading(true)
+  setError(null)
 
+  try {
+    const userId = await fetchUserInfo()
     if (!userId) {
       setError("User ID not found. Please log in again.")
       setLoading(false)
       return
     }
 
+    const token = localStorage.getItem("authToken")
+    if (!token) {
+      throw new Error("Authentication token not found.")
+    }
+
+    const response = await fetch(`${NOTIFICATIONS_API_URL}/notifications/${userId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || "Failed to fetch notifications.")
+    }
+
+    const data: NotificationsResponse = await response.json()
+    const sortedNotifications = data.notifications.sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    )
+    setNotifications(sortedNotifications)
+  } catch (err) {
+    console.error("Error fetching notifications:", err)
+    setError((err as Error).message || "Failed to load notifications.")
+  } finally {
+    setLoading(false)
+  }
+}, [NOTIFICATIONS_API_URL, fetchUserInfo])
+
+const markNotificationAsRead = useCallback(
+  async (notificationId: string) => {
     try {
       const token = localStorage.getItem("authToken")
       if (!token) {
-        throw new Error("Authentication token not found.")
+        console.warn("Authentication token not found for marking as read.")
+        return
       }
 
-      const response = await fetch(`${NOTIFICATIONS_API_URL}/notifications/${userId}`, {
-        method: "GET",
+      const userId = await fetchUserInfo()
+      if (!userId) {
+        console.warn("User ID not found, cannot mark notification as read.")
+        return
+      }
+
+      const response = await fetch(`${NOTIFICATIONS_API_URL}/notifications/${notificationId}/read`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({ read: true }),
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Failed to fetch notifications.")
+        console.warn("Failed to mark notification as read")
+        return
       }
 
-      const data: NotificationsResponse = await response.json()
-      const sortedNotifications = data.notifications.sort(
-        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-      )
-      setNotifications(sortedNotifications)
-    } catch (err) {
-      console.error("Error fetching notifications:", err)
-      setError((err as Error).message || "Failed to load notifications.")
-    } finally {
-      setLoading(false)
-    }
-  }, [NOTIFICATIONS_API_URL])
-
-  const markNotificationAsRead = useCallback(
-    async (notificationId: string) => {
-      try {
-        const token = localStorage.getItem("authToken")
-        if (!token) {
-          console.warn("Authentication token not found for marking as read.")
-          return
-        }
-
-        const response = await fetch(`${NOTIFICATIONS_API_URL}/notifications/${notificationId}/read`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ read: true }),
-        })
-
-        if (!response.ok) {
-          console.warn("Failed to mark notification as read")
-          return
-        }
-
-        setNotifications((prevNotifications) =>
-          prevNotifications.map((notif) => (notif.id === notificationId ? { ...notif, read: true } : notif)),
+      setNotifications((prevNotifications) =>
+        prevNotifications.map((notif) =>
+          notif.id === notificationId ? { ...notif, read: true } : notif
         )
-      } catch (err) {
-        console.warn("Error marking notification as read:", err)
-      }
-    },
-    [NOTIFICATIONS_API_URL],
-  )
+      )
+    } catch (err) {
+      console.warn("Error marking notification as read:", err)
+    }
+  },
+  [NOTIFICATIONS_API_URL, fetchUserInfo]
+)
 
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.read) {
